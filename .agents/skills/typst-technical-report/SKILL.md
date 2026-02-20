@@ -219,6 +219,78 @@ in   subset   forall   exists   <=   >=   !=   approx
 dot   times   arrow   tilde
 ```
 
+## PDF file attachments (embed source code / data files)
+
+When the user explicitly asks to **attach**, **embed**, or **bundle** files (source code, datasets, etc.) inside the PDF, use the post-processing pipeline below. Do **not** use this unless the user requests it.
+
+### Prerequisites
+
+Ensure PyMuPDF is available (one-time setup):
+
+```bash
+uv venv /tmp/embed-venv && source /tmp/embed-venv/bin/activate && uv pip install pymupdf
+```
+
+### Workflow
+
+1. **Add `#attach()` markers** in your `.typ` file where each file should be noted. Place them near the code listing or section that references the file.
+
+```typst
+// Paste this helper at the top of report.typ (after imports)
+#let attach(filename, description, label-name) = {
+  context {
+    let pos = here().position()
+    [
+      #metadata((
+        kind: "embed-file",
+        file: filename,
+        desc: description,
+        page: pos.page,
+        x: pos.x.pt(),
+        y: pos.y.pt(),
+      ))
+      #label(label-name)
+    ]
+  }
+}
+```
+
+2. **Use it** in the document body — one call per file to embed:
+
+```typst
+#attach("solver.py", "Main solver source code", "attach-solver")
+
+#raw(read("solver.py"), lang: "python", block: true)
+```
+
+3. **Compile with the embed script** instead of plain `typst compile`:
+
+```bash
+source /tmp/embed-venv/bin/activate
+python3 SKILL_DIR/tools/embed_files.py report.typ -o report.pdf
+```
+
+Replace `SKILL_DIR` with the resolved absolute path of this skill's directory.
+
+The script automatically:
+- Runs `typst compile`
+- Queries `#metadata` positions via `typst query`
+- Embeds each file into the PDF's attachment collection (visible in PDF viewer attachment panels)
+- Places a 📎 Paperclip annotation icon at the top-right corner of the relevant page
+
+4. **Copy output** to `/mnt/user-data/outputs/`
+
+### Viewer
+
+A standalone HTML-based PDF viewer with attachment support is at `tools/pdf-viewer.html`. Copy it alongside the PDF when the user needs a browser-based way to view and download embedded files (e.g., for sharing on static sites). It uses PDF.js from CDN — no server required.
+
+### Key points
+
+- Each `#attach()` call must have a **unique label name** (third argument)
+- The file path in `#attach("file.py", ...)` is resolved relative to the `.typ` file's directory (same as Typst's `read()`)
+- Multiple attachments on the same page stack their icons vertically at the top-right
+- The embedded files are byte-identical to the originals — readers can extract them from Adobe Acrobat, Firefox's PDF viewer, or the bundled `pdf-viewer.html`
+
 ## Pitfalls
 
 - **Fonts in PDF:** Only use system-installed fonts. LXGW WenKai / EB Garamond are **not** installed — use only in HTML via Google Fonts.

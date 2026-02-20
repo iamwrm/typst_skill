@@ -18,8 +18,11 @@ Key requirements from the spec:
 .agents/skills/typst-technical-report/
 ├── SKILL.md                          # Skill definition (frontmatter + instructions)
 ├── AGENTS.md                         # This file — development/verification docs
-└── references/
-    └── example-report.typ            # Full example: Chinese report with math, tables, blocks
+├── references/
+│   └── example-report.typ            # Full example: Chinese report with math, tables, blocks
+└── tools/
+    ├── embed_files.py                # Post-processor: embed file attachments into PDF
+    └── pdf-viewer.html               # Static HTML PDF viewer with attachment extraction
 ```
 
 ## Skill overview
@@ -30,6 +33,7 @@ The skill instructs agents to produce technical reports via two workflows:
 |----------|--------|-----------|
 | **PDF** | `.pdf` via Typst | `template.typ` + `report.typ` → `typst compile` |
 | **HTML** | Self-contained `.html` | KaTeX CDN for math, Google Fonts for CJK |
+| **PDF + attachments** | `.pdf` with embedded files | `report.typ` with `#attach()` → `tools/embed_files.py` |
 
 ## Development workflow
 
@@ -40,6 +44,7 @@ Edit `SKILL.md` in this directory. The file contains:
 - Markdown body with instructions for both PDF and HTML workflows
 - Embedded Typst template (copy-verbatim block)
 - HTML skeleton with KaTeX setup
+- PDF file attachment workflow using `tools/embed_files.py`
 
 ### 2. Validate skill loading
 
@@ -89,7 +94,62 @@ NOT Typst syntax). Include table, styled sections, LXGW WenKai font.
 - Math uses LaTeX syntax (`\frac{a}{b}`), not Typst syntax (`frac(a, b)`)
 - KaTeX CDN and Google Fonts are included in `<head>`
 
-### 5. Visual verification
+### 5. Test PDF attachment workflow
+
+```bash
+pi --model claude-opus-4-6 --provider anthropic -p "
+Use the typst-technical-report skill. Create a PDF report about a Python sorting algorithm.
+Include the Python source code in the document and also embed/attach it inside the PDF
+so readers can download the original file. Output to ./local_data/report.pdf
+"
+```
+
+**Verify:**
+- The agent uses the `#attach()` helper in the `.typ` file
+- The agent runs `tools/embed_files.py` instead of plain `typst compile`
+- PyMuPDF venv is set up automatically
+- The resulting PDF contains embedded files (check with):
+
+```bash
+source /tmp/embed-venv/bin/activate
+python3 -c "
+import fitz
+doc = fitz.open('local_data/report.pdf')
+print(f'Embedded files: {doc.embfile_count()}')
+for i in range(doc.embfile_count()):
+    info = doc.embfile_info(i)
+    data = doc.embfile_get(i)
+    print(f'  {info[\"name\"]} — {len(data)} bytes')
+for p in range(len(doc)):
+    for a in doc[p].annots():
+        if a.type[1] == 'FileAttachment':
+            print(f'  Annotation page {p+1}: {a.file_info[\"filename\"]} (top-right)')
+"
+```
+
+**Attachment checklist:**
+- [ ] `embfile_count() > 0` — files are in the embedded files collection
+- [ ] FileAttachment annotations present at top-right of relevant pages
+- [ ] Extracted file content is byte-identical to the original source file
+
+### 6. Test PDF viewer
+
+Copy `tools/pdf-viewer.html` alongside the PDF and open in a browser:
+
+```bash
+cp .agents/skills/typst-technical-report/tools/pdf-viewer.html local_data/
+cd local_data && python3 -m http.server 8080
+# Open http://localhost:8080/pdf-viewer.html?url=./report.pdf
+```
+
+**Verify:**
+- PDF renders in the viewer
+- Sidebar shows attachment cards with file icon, name, size
+- Text file previews are shown inline
+- Download button saves the correct file
+- Copy button copies text content to clipboard
+
+### 7. Visual verification
 
 Render outputs to images and inspect:
 
@@ -100,17 +160,8 @@ chromium --headless --disable-gpu --no-sandbox \
   --window-size=1200,2400 \
   "file://$(pwd)/local_data/report.html"
 
-# PDF → SVG → PNG (no ImageMagick needed)
-typst compile local_data/report.typ "local_data/page_{n}.svg"
-for f in local_data/page_*.svg; do
-  chromium --headless --disable-gpu --no-sandbox \
-    --screenshot="${f%.svg}.png" \
-    --window-size=850,1200 "file://$(pwd)/$f"
-done
-rm local_data/page_*.svg
-
-# Alternative: use pymupdf for PDF→PNG (install via uv)
-uv pip install pymupdf
+# PDF → PNG via pymupdf
+source /tmp/embed-venv/bin/activate
 python3 -c "
 import fitz
 doc = fitz.open('local_data/report.pdf')
@@ -126,8 +177,9 @@ for i, page in enumerate(doc):
 - [ ] Theorem/definition/remark blocks have colored left borders
 - [ ] Table headers are bold, rows are aligned
 - [ ] Page headers show author names and page numbers (PDF, page 2+)
+- [ ] Paperclip annotation icons visible at top-right of pages with attachments
 
-### 6. Commit
+### 8. Commit
 
 ```bash
 git add .agents/skills/typst-technical-report/
@@ -143,16 +195,51 @@ Test outputs go in `./local_data/` (git-ignored). Expected files after a full te
 local_data/
 ├── template.typ          # Typst template (copied from SKILL.md)
 ├── report.typ            # Generated Typst source
-├── report.pdf            # Compiled PDF
+├── report.pdf            # Compiled PDF (with or without attachments)
 ├── report.html           # Self-contained HTML
+├── pdf-viewer.html       # Copied from tools/ for browser testing
 ├── report_html.png       # HTML screenshot
 ├── report_pdf_p1.png     # PDF page renders
 ├── report_pdf_p2.png
-├── ...
+└── ...
 ```
+
+## Tools reference
+
+### `tools/embed_files.py`
+
+Post-processes a Typst PDF to add embedded file attachments.
+
+**Usage:**
+```bash
+python3 tools/embed_files.py <input.typ> [-o output.pdf] [-d base_dir]
+```
+
+**What it does (3 steps):**
+1. `typst compile input.typ output.pdf`
+2. `typst query input.typ metadata --format json` — extracts `embed-file` markers with page/position
+3. PyMuPDF post-processing:
+   - Adds files to the PDF embedded files collection (visible in attachment panels)
+   - Places FileAttachment annotations at top-right of each relevant page (stacked vertically if multiple per page)
+
+**Requires:** `pymupdf` (installed via `uv pip install pymupdf`)
+
+### `tools/pdf-viewer.html`
+
+Single-file static HTML page that renders PDFs and extracts embedded attachments using PDF.js (loaded from CDN).
+
+**Features:**
+- Drag-and-drop or file picker to open PDFs
+- Scrollable multi-page rendering
+- Sidebar listing all embedded attachments with:
+  - File icon (extension-based), filename, size
+  - Inline preview for text files
+  - Download and copy-to-clipboard buttons
+- URL parameter support: `?url=./report.pdf`
+- Works on any static hosting (GitHub Pages, S3, etc.) — no server needed
 
 ## Known issues
 
 - **`Latin Modern Roman` font warning**: The font may not be installed on all systems. Typst falls back gracefully to the CJK serif font. Not a blocker.
 - **`typst compile --format html`**: Experimental in Typst — drops math equations. The skill intentionally uses hand-written HTML with KaTeX instead.
-- **Chromium PDF→PNG**: Indirect route (PDF → SVG → chromium → PNG). Use `uv pip install pymupdf` for a cleaner path.
+- **PDF attachments in Preview.app**: macOS Preview does not support PDF file attachments. Use Firefox, Adobe Acrobat Reader, or the bundled `pdf-viewer.html`.

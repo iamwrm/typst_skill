@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Viewer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+  /* ── Design tokens ── */
+  :root {
+    --bg:       #0b0b0b;
+    --surface:  #141414;
+    --surface2: #1c1c1c;
+    --surface3: #242424;
+    --border:   #2a2a2a;
+    --border-h: #3a3a3a;
+    --accent:   #e8611a;
+    --accent-h: #f47a3a;
+    --accent-bg:#1f1410;
+    --text:     #d4d4d4;
+    --text-dim: #777;
+    --text-faint:#555;
+    --mono:     'IBM Plex Mono', 'SF Mono', 'Consolas', monospace;
+    --sans:     'Inter', -apple-system, sans-serif;
+    --radius:   6px;
+    --transition: 0.15s ease;
+  }
+
+  /* ── Reset ── */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-h); }
+
+  /* ── Button ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface2);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+  }
+  .btn:hover {
+    background: var(--surface3);
+    border-color: var(--border-h);
+    color: var(--text);
+  }
+  .btn--accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn--accent:hover {
+    background: var(--accent-h);
+    border-color: var(--accent-h);
+  }
+  .btn--browse { padding: 8px 20px; }
+  .btn svg { width: 14px; height: 14px; fill: currentColor; opacity: 0.7; }
+  .btn:hover svg { opacity: 1; }
+
+  .badge {
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  /* ── Topbar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 20px;
+    height: 48px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .topbar__logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .topbar__logo::before {
+    content: '';
+    width: 7px; height: 7px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+  .topbar__sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+  }
+  .topbar__spacer { flex: 1; }
+
+  /* ── Page nav ── */
+  .page-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .page-nav__input {
+    width: 40px;
+    text-align: center;
+    padding: 3px 4px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+  }
+  .page-nav__input:focus { border-color: var(--accent); }
+  .page-nav__total { color: var(--text-faint); }
+
+  /* ── Layout ── */
+  .layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── PDF canvas area ── */
+  .viewer {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    gap: 20px;
+  }
+  .viewer canvas {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.3);
+    border-radius: 2px;
+    max-width: 100%;
+  }
+
+  /* ── Dropzone ── */
+  .dropzone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 40px;
+    text-align: center;
+    transition: background var(--transition);
+  }
+  .dropzone--active { background: var(--accent-bg); }
+  .dropzone__icon {
+    width: 64px; height: 64px;
+    border: 2px dashed var(--border-h);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: var(--text-faint);
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .dropzone--active .dropzone__icon {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .dropzone__title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .dropzone__desc {
+    color: var(--text-faint);
+    font-size: 13px;
+    max-width: 380px;
+    line-height: 1.7;
+  }
+  .dropzone__divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: var(--text-faint);
+    font-size: 11px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    width: 200px;
+  }
+  .dropzone__divider::before,
+  .dropzone__divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 340px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.2s ease;
+  }
+  .sidebar--collapsed { width: 0; border: none; }
+  .sidebar__header {
+    padding: 14px 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .sidebar__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .sidebar__empty {
+    color: var(--text-faint);
+    font-size: 12px;
+    font-family: var(--mono);
+    padding: 20px 12px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  /* ── Attachment card ── */
+  .card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 10px;
+    transition: border-color var(--transition);
+  }
+  .card:hover { border-color: var(--border-h); }
+  .card__name {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    word-break: break-all;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card__name-icon { font-size: 16px; flex-shrink: 0; }
+  .card__meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    margin: 6px 0 12px;
+  }
+  .card__preview {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    max-height: 180px;
+    overflow: auto;
+    margin-bottom: 12px;
+    white-space: pre;
+    tab-size: 4;
+  }
+  .card__actions { display: flex; gap: 8px; }
+
+  @media (max-width: 768px) {
+    .sidebar {
+      position: fixed; right: 0; top: 0; bottom: 0; z-index: 20;
+      box-shadow: -4px 0 32px rgba(0,0,0,0.6);
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Topbar ── -->
+<header class="topbar">
+  <div class="topbar__logo">pdf-viewer</div>
+  <div class="topbar__sep"></div>
+  <button class="btn" data-action="open">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+    open
+  </button>
+  <nav class="page-nav hidden" data-ref="pageNav">
+    <button class="btn" data-action="prevPage">‹</button>
+    <input class="page-nav__input" type="number" min="1" value="1" data-ref="pageNum">
+    <span class="page-nav__total">/ <span data-ref="pageCount">0</span></span>
+    <button class="btn" data-action="nextPage">›</button>
+  </nav>
+  <div class="topbar__spacer"></div>
+  <button class="btn hidden" data-action="toggleSidebar" data-ref="sidebarToggle">
+    <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 1.38-1.12 2.5-2.5 2.5S11.5 18.88 11.5 17.5V5A3.5 3.5 0 0115 1.5 3.5 3.5 0 0118.5 5v12.5c0 2.76-2.24 5-5 5s-5-2.24-5-5V6H10v11.5a3.5 3.5 0 003.5 3.5 3.5 3.5 0 003.5-3.5V5c0-1.38-1.12-2.5-2.5-2.5S12 3.62 12 5v12.5c0 .55.45 1 1 1s1-.45 1-1V6h1.5z"/></svg>
+    attachments <span class="badge hidden" data-ref="attBadge">0</span>
+  </button>
+  <input type="file" accept=".pdf,application/pdf" class="hidden" data-ref="fileInput">
+</header>
+
+<!-- ── Main layout ── -->
+<div class="layout">
+  <!-- PDF viewer -->
+  <main class="viewer" data-ref="viewer">
+    <div class="dropzone" data-ref="dropzone">
+      <div class="dropzone__icon">↓</div>
+      <h2 class="dropzone__title">Open a PDF</h2>
+      <p class="dropzone__desc">
+        Drop a PDF here to view it. Embedded file attachments
+        will appear in the sidebar for preview and download.
+      </p>
+      <div class="dropzone__divider">or</div>
+      <label class="btn btn--accent btn--browse">
+        Browse files
+        <input type="file" accept=".pdf,application/pdf" class="hidden" data-ref="fileInput2">
+      </label>
+    </div>
+  </main>
+
+  <!-- Attachment sidebar -->
+  <aside class="sidebar sidebar--collapsed" data-ref="sidebar">
+    <div class="sidebar__header">
+      Attachments <span class="badge" data-ref="attCount">0</span>
+    </div>
+    <div class="sidebar__body" data-ref="attList">
+      <p class="sidebar__empty">No attachments found.</p>
+    </div>
+  </aside>
+</div>
+
+<!-- ── Card template ── -->
+<template data-ref="cardTpl">
+  <div class="card">
+    <div class="card__name">
+      <span class="card__name-icon" data-slot="icon"></span>
+      <span data-slot="filename"></span>
+    </div>
+    <div class="card__meta" data-slot="meta"></div>
+    <div class="card__actions">
+      <button class="btn btn--accent" data-action="download">
+        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        download
+      </button>
+    </div>
+  </div>
+</template>
+
+<script type="module">
+
+/* ═══════════════════════════════════════════════════
+   Config
+   ═══════════════════════════════════════════════════ */
+
+const PDFJS_VERSION = "4.9.155";
+const PDFJS_CDN     = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build`;
+const RENDER_SCALE  = 1.5;
+const PREVIEW_MAX   = 2000;
+const COPY_FEEDBACK_MS = 1500;
+
+const TEXT_EXTENSIONS = new Set(
+  "py,js,ts,html,css,json,csv,xml,yaml,yml,txt,md,rs,go,c,cpp,h,hpp,java,rb,sh,sql,toml,ini,cfg,conf,log,typ,tex,r,m,swift,kt,scala,pl,lua,zig,nim,v,d".split(",")
+);
+
+const FILE_ICONS = {
+  py:"🐍", js:"📜", ts:"📘", html:"🌐", css:"🎨", json:"📋", csv:"📊",
+  xml:"📄", yaml:"⚙️", yml:"⚙️", txt:"📝", md:"📝", rs:"🦀", go:"🔷",
+  c:"⚡", cpp:"⚡", h:"⚡", java:"☕", rb:"💎", sh:"🖥️", sql:"🗃️",
+  png:"🖼️", jpg:"🖼️", gif:"🖼️", svg:"🖼️", pdf:"📄",
+  zip:"📦", tar:"📦", gz:"📦",
+};
+
+/* ═══════════════════════════════════════════════════
+   Utilities
+   ═══════════════════════════════════════════════════ */
+
+const Utils = {
+  /** Get file extension (lowercase, no dot). */
+  ext(name) {
+    return name.split(".").pop().toLowerCase();
+  },
+
+  isText(name) {
+    return TEXT_EXTENSIONS.has(this.ext(name));
+  },
+
+  icon(name) {
+    return FILE_ICONS[this.ext(name)] ?? "📁";
+  },
+
+  formatBytes(n) {
+    if (n < 1024)    return `${n} B`;
+    if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / 1048576).toFixed(1)} MB`;
+  },
+
+  escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  },
+
+  decode(buf) {
+    return new TextDecoder("utf-8").decode(buf);
+  },
+
+  downloadBlob(data, filename) {
+    const url = URL.createObjectURL(new Blob([data], { type: "application/octet-stream" }));
+    Object.assign(document.createElement("a"), { href: url, download: filename }).click();
+    URL.revokeObjectURL(url);
+  },
+};
+
+/* ═══════════════════════════════════════════════════
+   DOM helpers
+   ═══════════════════════════════════════════════════ */
+
+/** Collect all data-ref elements into an object. */
+function collectRefs(root = document) {
+  const refs = {};
+  for (const el of root.querySelectorAll("[data-ref]")) {
+    refs[el.dataset.ref] = el;
+  }
+  return refs;
+}
+
+/** Bind click handlers via data-action delegation. */
+function bindActions(root, handlers) {
+  root.addEventListener("click", (e) => {
+    const target = e.target.closest("[data-action]");
+    if (target && handlers[target.dataset.action]) {
+      handlers[target.dataset.action](e, target);
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   PDF Engine — wraps PDF.js
+   ═══════════════════════════════════════════════════ */
+
+class PDFEngine {
+  #doc = null;
+
+  async init() {
+    const lib = await import(`${PDFJS_CDN}/pdf.min.mjs`);
+    lib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}/pdf.worker.min.mjs`;
+    this.lib = lib;
+  }
+
+  async load(data) {
+    this.#doc = await this.lib.getDocument({ data }).promise;
+    return this.#doc;
+  }
+
+  get numPages() {
+    return this.#doc?.numPages ?? 0;
+  }
+
+  async renderPage(pageNum, scale = RENDER_SCALE) {
+    const page = await this.#doc.getPage(pageNum);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.dataset.page = pageNum;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    return canvas;
+  }
+
+  /** Extract all file attachments (embedded files + page annotations). */
+  async getAttachments() {
+    const results = [];
+
+    // 1. Embedded files collection
+    const embedded = await this.#doc.getAttachments();
+    if (embedded) {
+      for (const [key, att] of Object.entries(embedded)) {
+        results.push({ filename: att.filename || key, content: att.content });
+      }
+    }
+
+    // 2. FileAttachment annotations (fallback / additional)
+    if (results.length === 0) {
+      for (let i = 1; i <= this.numPages; i++) {
+        const page = await this.#doc.getPage(i);
+        for (const a of await page.getAnnotations()) {
+          if (a.subtype === "FileAttachment" && a.file) {
+            results.push({
+              filename: a.file.filename || `attachment_p${i}`,
+              content: a.file.content,
+            });
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   App
+   ═══════════════════════════════════════════════════ */
+
+class App {
+  constructor() {
+    this.pdf = new PDFEngine();
+    this.refs = collectRefs();
+    this.cardTpl = this.refs.cardTpl.content;
+  }
+
+  async init() {
+    await this.pdf.init();
+    this.#bindEvents();
+    await this.#loadFromUrlParam();
+  }
+
+  /* ── Event wiring ── */
+
+  #bindEvents() {
+    // Button actions (delegated)
+    bindActions(document.body, {
+      open:          () => this.refs.fileInput.click(),
+      prevPage:      () => this.#goToPage(this.#currentPage - 1),
+      nextPage:      () => this.#goToPage(this.#currentPage + 1),
+      toggleSidebar: () => this.refs.sidebar.classList.toggle("sidebar--collapsed"),
+    });
+
+    // File inputs
+    const onFile = (e) => this.#handleFile(e.target.files[0]);
+    this.refs.fileInput.addEventListener("change", onFile);
+    this.refs.fileInput2.addEventListener("change", onFile);
+
+    // Drag & drop
+    const { viewer, dropzone } = this.refs;
+    viewer.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dropzone--active");
+    });
+    viewer.addEventListener("dragleave", () => {
+      dropzone.classList.remove("dropzone--active");
+    });
+    viewer.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dropzone--active");
+      this.#handleFile(e.dataTransfer.files[0]);
+    });
+
+    // Page input
+    this.refs.pageNum.addEventListener("change", () => {
+      this.#scrollToPage(parseInt(this.refs.pageNum.value));
+    });
+
+    // Track visible page on scroll
+    viewer.addEventListener("scroll", () => this.#syncPageIndicator(), { passive: true });
+  }
+
+  /* ── File handling ── */
+
+  #handleFile(file) {
+    if (!file?.type.includes("pdf")) return;
+    const reader = new FileReader();
+    reader.onload = (e) => this.#loadPdf(new Uint8Array(e.target.result));
+    reader.readAsArrayBuffer(file);
+  }
+
+  async #loadPdf(data) {
+    await this.pdf.load(data);
+    await this.#renderPages();
+    await this.#renderAttachments();
+  }
+
+  async #loadFromUrlParam() {
+    const url = new URLSearchParams(location.search).get("url");
+    if (!url) return;
+    try {
+      const resp = await fetch(url);
+      await this.#loadPdf(new Uint8Array(await resp.arrayBuffer()));
+    } catch (e) {
+      console.error("Failed to load PDF from URL:", e);
+    }
+  }
+
+  /* ── PDF rendering ── */
+
+  async #renderPages() {
+    const { viewer, dropzone, pageNav, pageNum, pageCount } = this.refs;
+
+    // Clear old canvases
+    viewer.querySelectorAll("canvas").forEach((c) => c.remove());
+    dropzone.classList.add("hidden");
+
+    for (let i = 1; i <= this.pdf.numPages; i++) {
+      viewer.appendChild(await this.pdf.renderPage(i));
+    }
+
+    // Page nav
+    pageCount.textContent = this.pdf.numPages;
+    pageNum.max = this.pdf.numPages;
+    pageNum.value = 1;
+    pageNav.classList.toggle("hidden", this.pdf.numPages <= 1);
+  }
+
+  /* ── Attachments ── */
+
+  async #renderAttachments() {
+    const attachments = await this.pdf.getAttachments();
+    const { attList, attCount, attBadge, sidebarToggle, sidebar } = this.refs;
+    const count = attachments.length;
+
+    // Update badges
+    attCount.textContent = count;
+    attBadge.textContent = count;
+    attBadge.classList.toggle("hidden", count === 0);
+    sidebarToggle.classList.remove("hidden");
+
+    if (count === 0) {
+      attList.innerHTML = `<p class="sidebar__empty">No attachments found.</p>`;
+      return;
+    }
+
+    // Build cards
+    attList.innerHTML = "";
+    for (const att of attachments) {
+      attList.appendChild(this.#createCard(att));
+    }
+    sidebar.classList.remove("sidebar--collapsed");
+  }
+
+  /** Create a card element from the <template>. */
+  #createCard({ filename, content }) {
+    const frag = this.cardTpl.cloneNode(true);
+    const card = frag.querySelector(".card");
+    const slot = (name) => card.querySelector(`[data-slot="${name}"]`);
+
+    slot("icon").textContent = Utils.icon(filename);
+    slot("filename").textContent = filename;
+    slot("meta").textContent = Utils.formatBytes(content.length);
+
+    // Text preview
+    if (Utils.isText(filename)) {
+      try {
+        const text = Utils.decode(content);
+        const truncated = text.length > PREVIEW_MAX ? text.slice(0, PREVIEW_MAX) + "\n…" : text;
+        const pre = document.createElement("div");
+        pre.className = "card__preview";
+        pre.textContent = truncated;
+        card.querySelector(".card__actions").before(pre);
+      } catch { /* binary */ }
+
+      // Copy button
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "btn";
+      copyBtn.textContent = "copy";
+      copyBtn.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(Utils.decode(content));
+        copyBtn.textContent = "copied";
+        copyBtn.style.color = "var(--accent)";
+        setTimeout(() => { copyBtn.textContent = "copy"; copyBtn.style.color = ""; }, COPY_FEEDBACK_MS);
+      });
+      card.querySelector(".card__actions").appendChild(copyBtn);
+    }
+
+    // Download
+    card.querySelector('[data-action="download"]').addEventListener("click", () => {
+      Utils.downloadBlob(content, filename);
+    });
+
+    return card;
+  }
+
+  /* ── Page navigation ── */
+
+  get #currentPage() {
+    return parseInt(this.refs.pageNum.value) || 1;
+  }
+
+  #goToPage(n) {
+    const clamped = Math.max(1, Math.min(this.pdf.numPages, n));
+    this.refs.pageNum.value = clamped;
+    this.#scrollToPage(clamped);
+  }
+
+  #scrollToPage(n) {
+    this.refs.viewer
+      .querySelector(`canvas[data-page="${n}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  #syncPageIndicator() {
+    const viewerTop = this.refs.viewer.getBoundingClientRect().top;
+    for (const c of this.refs.viewer.querySelectorAll("canvas")) {
+      const r = c.getBoundingClientRect();
+      if (r.top >= viewerTop - r.height / 2) {
+        this.refs.pageNum.value = c.dataset.page;
+        break;
+      }
+    }
+  }
+}
+
+/* ── Bootstrap ── */
+await new App().init();
+
+</script>
+</body>
+</html>
