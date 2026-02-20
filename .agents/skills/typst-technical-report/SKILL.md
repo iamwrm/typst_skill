@@ -147,6 +147,8 @@ $ frac(partial bold(u), partial t) + (bold(u) dot nabla) bold(u) = -frac(1, rho)
 #theorem[定理 1][$ norm(bold(u) - bold(u)_h)_(H^1) <= C h^p abs(bold(u))_(H^(p+1)) $]
 ```
 
+See [full example report](references/example-report.typ) for a complete Chinese report with math, tables, and theorem/definition/remark blocks.
+
 ### Language config
 
 | `lang` | `region` | CJK font selected | Indent |

@@ -16,8 +16,10 @@ Key requirements from the spec:
 
 ```
 .agents/skills/typst-technical-report/
-├── SKILL.md      # Skill definition (frontmatter + instructions)
-└── AGENTS.md     # This file — development/verification docs
+├── SKILL.md                          # Skill definition (frontmatter + instructions)
+├── AGENTS.md                         # This file — development/verification docs
+└── references/
+    └── example-report.typ            # Full example: Chinese report with math, tables, blocks
 ```
 
 ## Skill overview
