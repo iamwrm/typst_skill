@@ -21,6 +21,6 @@ The skill is defined in `.agents/skills/typst-technical-report/` and is automati
    ```bash
    make zip
    ```
-2. Upload `local_data/typst-technical-report.zip` to a [Claude.ai](https://claude.ai) project's **Project knowledge**.
+2. Go to [Claude.ai](https://claude.ai) → **Settings** → **Capabilities** → **Skills** → **Add** → **Upload skill**, and upload `local_data/typst-technical-report.zip`.
 
 See [SKILL.md](.agents/skills/typst-technical-report/SKILL.md) for full instructions.
