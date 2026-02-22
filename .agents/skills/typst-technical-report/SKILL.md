@@ -1,6 +1,6 @@
 ---
 name: typst-technical-report
-description: "Create technical reports, academic papers, or formatted documents as PDF or HTML using Typst. Use when the user wants math equations, code blocks, tables, theorems, or CJK (Chinese/Japanese) content in a publication-quality document. Also triggers on 'Typst', '.typ', or requests for LaTeX-quality output. Do NOT use for .docx (use docx skill) or slides (use pptx skill)."
+description: "Create technical reports, academic papers, or formatted documents as PDF or HTML using Typst. Use when the user wants math equations, code blocks, tables, theorems, or CJK (Chinese/Japanese) content in a publication-quality document. Also triggers on 'Typst', '.typ', or requests for LaTeX-quality output. Supports embedding source files as PDF attachments. Do NOT use for .docx (use docx skill) or slides (use pptx skill)."
 license: MIT
 compatibility: "Requires typst ≥0.14 (pre-installed). System fonts: Latin Modern Roman, Noto Serif/Sans CJK SC/TC/JP/KR, DejaVu Sans Mono. HTML output needs network for KaTeX CDN."
 metadata:
@@ -221,22 +221,14 @@ dot   times   arrow   tilde
 
 ## PDF file attachments (embed source code / data files)
 
-When the user explicitly asks to **attach**, **embed**, or **bundle** files (source code, datasets, etc.) inside the PDF, use the post-processing pipeline below. Do **not** use this unless the user requests it.
-
-### Prerequisites
-
-Ensure PyMuPDF is available (one-time setup):
-
-```bash
-uv venv /tmp/embed-venv && source /tmp/embed-venv/bin/activate && uv pip install pymupdf
-```
+When the user asks to **attach**, **embed**, or **bundle** files inside the PDF, use this pipeline. Do **not** use unless requested.
 
 ### Workflow
 
-1. **Add `#attach()` markers** in your `.typ` file where each file should be noted. Place them near the code listing or section that references the file.
+1. **Add `#attach()` helper and markers** in your `.typ` file:
 
 ```typst
-// Paste this helper at the top of report.typ (after imports)
+// Paste at top of report.typ (after imports)
 #let attach(filename, description, label-name) = {
   context {
     let pos = here().position()
@@ -253,43 +245,53 @@ uv venv /tmp/embed-venv && source /tmp/embed-venv/bin/activate && uv pip install
     ]
   }
 }
-```
 
-2. **Use it** in the document body — one call per file to embed:
-
-```typst
+// Use in document body — one call per file:
 #attach("solver.py", "Main solver source code", "attach-solver")
-
 #raw(read("solver.py"), lang: "python", block: true)
 ```
 
-3. **Compile with the embed script** instead of plain `typst compile`:
+2. **Compile with the embed script** (uses `uv run`, no venv needed):
 
 ```bash
-source /tmp/embed-venv/bin/activate
-python3 SKILL_DIR/tools/embed_files.py report.typ -o report.pdf
+uv run --with pymupdf python3 SKILL_DIR/tools/embed_files.py report.typ -o report.pdf
 ```
 
-Replace `SKILL_DIR` with the resolved absolute path of this skill's directory.
+Replace `SKILL_DIR` with the resolved absolute path of this skill's directory. The script runs `typst compile`, queries `#metadata` positions, embeds files into the PDF attachment collection, and places 📎 annotation icons on relevant pages.
 
-The script automatically:
-- Runs `typst compile`
-- Queries `#metadata` positions via `typst query`
-- Embeds each file into the PDF's attachment collection (visible in PDF viewer attachment panels)
-- Places a 📎 Paperclip annotation icon at the top-right corner of the relevant page
-
-4. **Copy output** to `/mnt/user-data/outputs/`
+3. **Copy output** to `/mnt/user-data/outputs/`
 
 ### Viewer
 
-A standalone HTML-based PDF viewer with attachment support is at `tools/pdf-viewer.html`. Copy it alongside the PDF when the user needs a browser-based way to view and download embedded files (e.g., for sharing on static sites). It uses PDF.js from CDN — no server required.
+A standalone HTML-based PDF viewer with attachment support is at `tools/pdf-viewer.html`. Copy it alongside the PDF for browser-based viewing/downloading of embedded files. Uses PDF.js from CDN — no server required.
 
-### Key points
+### ⚠️ MANDATORY: Document attachment listing
 
-- Each `#attach()` call must have a **unique label name** (third argument)
-- The file path in `#attach("file.py", ...)` is resolved relative to the `.typ` file's directory (same as Typst's `read()`)
-- Multiple attachments on the same page stack their icons vertically at the top-right
-- The embedded files are byte-identical to the originals — readers can extract them from Adobe Acrobat, Firefox's PDF viewer, or the bundled `pdf-viewer.html`
+**If the PDF attachments feature is used, the agent MUST add a section at the end of the document** listing all embedded file names and extraction instructions. Users may not have PDF viewers that surface attachments. Include this in the `.typ` file:
+
+```typst
+= Appendix: Embedded File Attachments
+
+This PDF contains the following embedded file attachments:
+
+// List each attached file, e.g.:
+- `solver.py` — Main solver source code
+- `data.csv` — Input dataset
+
+To extract the attachments, install #link("https://docs.astral.sh/uv/")[uv], then replace `THIS.pdf` with the actual filename and run:
+
+*List attachments:*
+```
+uv run --with pymupdf python3 -c "import sys,fitz;d=fitz.open(sys.argv[1]);[print(d.embfile_info(i)['filename'],d.embfile_info(i)['size'],'bytes') for i in range(d.embfile_count())]" THIS.pdf
+```
+
+*Extract all attachments to current directory:*
+```
+uv run --with pymupdf python3 -c "import sys,fitz,pathlib;d=fitz.open(sys.argv[1]);[(pathlib.Path(n:=d.embfile_info(i)['filename']).write_bytes(d.embfile_get(i)),print('Extracted',n)) for i in range(d.embfile_count())]" THIS.pdf
+```
+```
+
+**Do NOT skip this section.** These instructions may be the user's only way to discover and extract the embedded files.
 
 ## Pitfalls
 
