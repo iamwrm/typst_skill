@@ -269,7 +269,7 @@ A standalone HTML-based PDF viewer with attachment support is at `tools/pdf-view
 
 **If the PDF attachments feature is used, the agent MUST add a section at the end of the document** listing all embedded file names and extraction instructions. Users may not have PDF viewers that surface attachments. Include this in the `.typ` file:
 
-```typst
+````typst
 = Appendix: Embedded File Attachments
 
 This PDF contains the following embedded file attachments:
@@ -289,7 +289,7 @@ uv run --with pymupdf python3 -c "import sys,fitz;d=fitz.open(sys.argv[1]);[prin
 ```
 uv run --with pymupdf python3 -c "import sys,fitz,pathlib;d=fitz.open(sys.argv[1]);[(pathlib.Path(n:=d.embfile_info(i)['filename']).write_bytes(d.embfile_get(i)),print('Extracted',n)) for i in range(d.embfile_count())]" THIS.pdf
 ```
-```
+````
 
 **Do NOT skip this section.** These instructions may be the user's only way to discover and extract the embedded files.
 
