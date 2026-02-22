@@ -11,6 +11,16 @@ An agent skill for creating technical reports, academic papers, and formatted do
 
 ## Usage
 
+### With pi (or compatible agent harness)
+
 The skill is defined in `.agents/skills/typst-technical-report/` and is automatically picked up by compatible agent harnesses (e.g. [pi](https://github.com/mariozechner/pi-coding-agent)).
+
+### With Claude.ai
+
+1. Build the skill zip:
+   ```bash
+   make zip
+   ```
+2. Upload `local_data/typst-technical-report.zip` to a [Claude.ai](https://claude.ai) project's **Project knowledge**.
 
 See [SKILL.md](.agents/skills/typst-technical-report/SKILL.md) for full instructions.
