@@ -7,10 +7,14 @@ ZIP_FILE   := $(OUT_DIR)/$(SKILL_NAME).zip
 
 zip: $(ZIP_FILE)
 
-$(ZIP_FILE): $(shell find $(SKILL_DIR) -type f)
+$(ZIP_FILE): $(shell find $(SKILL_DIR) -type f ! -path '*/__pycache__/*' ! -name '*.pyc' ! -name '.DS_Store')
 	@mkdir -p $(OUT_DIR)
 	@rm -f $@
-	cd $(SKILL_DIR) && zip -r ../../../$@ .
+	cd $(SKILL_DIR) && zip -r ../../../$@ . \
+		-x '*/__pycache__/*' \
+		-x '*.pyc' \
+		-x '*.pyo' \
+		-x '.DS_Store'
 	@echo "Created $@ ($$(du -h $@ | cut -f1))"
 	@echo "Contents:"; unzip -l $@
 

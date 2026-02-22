@@ -2,39 +2,51 @@
 """
 embed_files.py — Post-process a Typst-generated PDF to embed file attachments.
 
-Usage:
-    python embed_files.py <input.typ> [--output output.pdf] [--base-dir .]
+Recommended usage:
+    uv run --with pymupdf python3 tools/embed_files.py <input.typ> [--output output.pdf] [--base-dir .]
 
 Workflow:
-  1. Compiles the .typ file to PDF via `typst compile`
-  2. Queries metadata labels with `typst query` to find embed-file markers
-  3. Uses PyMuPDF to embed each referenced file and place a clickable
-     FileAttachment annotation at the marked position on the page.
+  1. Compile the .typ file to PDF via `typst compile`
+  2. Query metadata with `typst query` to find embed-file markers
+  3. Use PyMuPDF to embed each referenced file and place a clickable
+     FileAttachment annotation near the marked position on the page.
 """
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
-import fitz  # PyMuPDF
+
+def require_pymupdf():
+    try:
+        import fitz  # PyMuPDF
+    except ModuleNotFoundError:
+        print(
+            "Missing dependency: pymupdf (fitz).\n"
+            "Run with uv (recommended):\n"
+            "  uv run --with pymupdf python3 tools/embed_files.py <input.typ> -o <output.pdf>",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    return fitz
 
 
 def run_typst_compile(typ_path: Path, pdf_path: Path) -> None:
-    """Compile .typ → .pdf"""
+    """Compile .typ → .pdf and surface all Typst warnings/errors."""
     cmd = ["typst", "compile", str(typ_path), str(pdf_path)]
     result = subprocess.run(cmd, capture_output=True, text=True)
-    # Typst prints warnings to stderr even on success
+
     if result.returncode != 0:
-        print(f"typst compile failed:\n{result.stderr}", file=sys.stderr)
+        details = (result.stderr or result.stdout or "").strip()
+        print(f"typst compile failed:\n{details}", file=sys.stderr)
         sys.exit(1)
-    if result.stderr:
-        # Print warnings but don't fail
+
+    if result.stderr.strip():
+        print("typst compile warnings:", file=sys.stderr)
         for line in result.stderr.splitlines():
-            if "error" in line.lower():
-                print(line, file=sys.stderr)
+            print(line, file=sys.stderr)
 
 
 def query_embed_metadata(typ_path: Path) -> list[dict]:
@@ -45,8 +57,12 @@ def query_embed_metadata(typ_path: Path) -> list[dict]:
         print(f"typst query failed:\n{result.stderr}", file=sys.stderr)
         sys.exit(1)
 
-    all_meta = json.loads(result.stdout)
-    # Filter to embed-file entries
+    try:
+        all_meta = json.loads(result.stdout)
+    except json.JSONDecodeError as e:
+        print(f"typst query returned invalid JSON: {e}", file=sys.stderr)
+        sys.exit(1)
+
     entries = []
     for m in all_meta:
         val = m.get("value", {})
@@ -60,15 +76,17 @@ def embed_files_in_pdf(pdf_path: Path, entries: list[dict], base_dir: Path) -> N
     Open the PDF, embed files, and add FileAttachment annotations.
     Saves in-place.
     """
+    fitz = require_pymupdf()
     doc = fitz.open(str(pdf_path))
+    placement_counts: dict[tuple[int, int, int], int] = {}
 
     for entry in entries:
         filename = entry["file"]
         desc = entry.get("desc", filename)
         page_num = int(entry["page"]) - 1  # Typst pages are 1-indexed, PyMuPDF 0-indexed
         # Typst coordinates: x,y in points from top-left
-        x_pt = float(entry["x"])
-        y_pt = float(entry["y"])
+        x_pt = float(entry.get("x", 0))
+        y_pt = float(entry.get("y", 0))
 
         file_path = base_dir / filename
         if not file_path.exists():
@@ -91,24 +109,28 @@ def embed_files_in_pdf(pdf_path: Path, entries: list[dict], base_dir: Path) -> N
             # Already embedded (duplicate name)
             print(f"  ⚠ File already embedded: {filename}")
 
-        # 2) Add a FileAttachment annotation on the page at the marked position
+        # 2) Add a FileAttachment annotation on the marked page
         if page_num < 0 or page_num >= len(doc):
-            print(f"WARNING: Page {page_num+1} out of range for {filename}", file=sys.stderr)
+            print(f"WARNING: Page {page_num + 1} out of range for {filename}", file=sys.stderr)
             continue
 
         page = doc[page_num]
-
-        # Place the annotation icon at the top-right corner of the page.
-        # Count existing file annotations on this page to stack them vertically.
-        existing = sum(1 for a in page.annots() if a.type[1] == "FileAttachment")
-        margin = 16
-        icon_size = 20
-        spacing = icon_size + 6
         rect = page.rect
-        point = fitz.Point(
-            rect.width - margin - icon_size,   # right edge
-            margin + existing * spacing,        # stack downward
-        )
+        icon_size = 20
+        margin = 12
+
+        # Place annotation near the metadata marker and keep it on-page.
+        anchor_x = max(margin, min(x_pt, rect.width - icon_size - margin))
+        anchor_y = max(margin, min(y_pt, rect.height - icon_size - margin))
+
+        # If multiple attachments map to the same place, stack downward.
+        key = (page_num, round(anchor_x / 8), round(anchor_y / 8))
+        offset = placement_counts.get(key, 0)
+        placement_counts[key] = offset + 1
+
+        stacked_y = min(anchor_y + offset * (icon_size + 4), rect.height - icon_size - margin)
+        point = fitz.Point(anchor_x, stacked_y)
+
         annot = page.add_file_annot(
             point=point,
             buffer_=file_data,
@@ -122,13 +144,16 @@ def embed_files_in_pdf(pdf_path: Path, entries: list[dict], base_dir: Path) -> N
         annot.set_colors(stroke=(0.1, 0.2, 0.5))  # Dark blue
         annot.update()
 
-        print(f"  ✓ Annotation on page {page_num+1} at top-right ({point.x:.1f}, {point.y:.1f}): {filename}")
+        print(
+            f"  ✓ Annotation on page {page_num + 1} near marker "
+            f"({point.x:.1f}, {point.y:.1f}): {filename}"
+        )
 
     doc.saveIncr()
     doc.close()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Compile Typst to PDF with embedded file attachments"
     )
@@ -143,12 +168,12 @@ def main():
         sys.exit(1)
 
     base_dir = Path(args.base_dir).resolve() if args.base_dir else typ_path.parent
-    pdf_path = Path(args.output) if args.output else typ_path.with_suffix(".pdf")
+    pdf_path = Path(args.output).resolve() if args.output else typ_path.with_suffix(".pdf")
 
     print(f"[1/3] Compiling {typ_path.name} → {pdf_path.name}")
     run_typst_compile(typ_path, pdf_path)
 
-    print(f"[2/3] Querying embed-file metadata")
+    print("[2/3] Querying embed-file metadata")
     entries = query_embed_metadata(typ_path)
     if not entries:
         print("  No embed-file metadata found. PDF is ready (no attachments).")
@@ -162,7 +187,7 @@ def main():
     embed_files_in_pdf(pdf_path, entries, base_dir)
 
     print(f"\n✅ Done! Output: {pdf_path}")
-    print(f"   Open in a PDF viewer to see attachments (📎 panel or page annotations)")
+    print("   Open in a PDF viewer to see attachments (📎 panel or page annotations)")
 
 
 if __name__ == "__main__":

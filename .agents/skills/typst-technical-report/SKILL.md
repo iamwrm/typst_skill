@@ -2,7 +2,7 @@
 name: typst-technical-report
 description: "Create technical reports, academic papers, or formatted documents as PDF or HTML using Typst. Use when the user wants math equations, code blocks, tables, theorems, or CJK (Chinese/Japanese) content in a publication-quality document. Also triggers on 'Typst', '.typ', or requests for LaTeX-quality output. Supports embedding source files as PDF attachments. Do NOT use for .docx (use docx skill) or slides (use pptx skill)."
 license: MIT
-compatibility: "Requires typst ≥0.14 (pre-installed). System fonts: Latin Modern Roman, Noto Serif/Sans CJK SC/TC/JP/KR, DejaVu Sans Mono. HTML output needs network for KaTeX CDN."
+compatibility: "Requires typst ≥0.14 (pre-installed). System fonts: Latin Modern Roman, Noto Serif/Sans CJK SC/TC/JP/KR, DejaVu Sans Mono. HTML output defaults to KaTeX/Google Fonts CDN (vendor assets for offline use)."
 metadata:
   version: "1.0"
 ---
@@ -14,14 +14,14 @@ metadata:
 | User signal | Output | Method |
 |---|---|---|
 | "PDF", "paper", "print", "download", or no preference | **PDF** | `typst compile report.typ report.pdf` |
-| "HTML", "artifact", "preview", "render in chat" | **HTML** | Write self-contained `.html` with KaTeX |
+| "HTML", "artifact", "preview", "render in chat" | **HTML** | Write a single-file `.html` with KaTeX (CDN by default) |
 
 ## PDF workflow
 
-1. Create `template.typ` in `/home/claude` using the template below
+1. Create `template.typ` in the current working directory (same folder as `report.typ`) using the template below
 2. Create `report.typ` that imports it
 3. `typst compile report.typ report.pdf`
-4. Copy to `/mnt/user-data/outputs/`
+4. Copy the final output to the harness output directory if one is provided (commonly `/mnt/user-data/outputs/`)
 
 ### Template (copy verbatim to `template.typ`)
 
@@ -162,7 +162,7 @@ For English-only: set `lang: "en"`, `abstract-zh: none`.
 
 ## HTML workflow
 
-Write a self-contained `.html` directly. Do **not** use `typst compile --format html` (drops math).
+Write a single-file `.html` directly. By default this uses CDN assets (KaTeX, optional web fonts), so network access is required unless you vendor those files locally. Do **not** use `typst compile --format html` (drops math).
 
 ### Minimal skeleton
 
@@ -257,9 +257,9 @@ When the user asks to **attach**, **embed**, or **bundle** files inside the PDF,
 uv run --with pymupdf python3 SKILL_DIR/tools/embed_files.py report.typ -o report.pdf
 ```
 
-Replace `SKILL_DIR` with the resolved absolute path of this skill's directory. The script runs `typst compile`, queries `#metadata` positions, embeds files into the PDF attachment collection, and places 📎 annotation icons on relevant pages.
+Replace `SKILL_DIR` with the resolved absolute path of this skill's directory. The script runs `typst compile`, queries `#metadata` positions, embeds files into the PDF attachment collection, and places 📎 annotation icons near each marker position.
 
-3. **Copy output** to `/mnt/user-data/outputs/`
+3. **Copy output** to the harness output directory if one is provided (commonly `/mnt/user-data/outputs/`)
 
 ### Viewer
 

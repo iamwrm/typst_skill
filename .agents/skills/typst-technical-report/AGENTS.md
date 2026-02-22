@@ -32,7 +32,7 @@ The skill instructs agents to produce technical reports via two workflows:
 | Workflow | Output | Toolchain |
 |----------|--------|-----------|
 | **PDF** | `.pdf` via Typst | `template.typ` + `report.typ` → `typst compile` |
-| **HTML** | Self-contained `.html` | KaTeX CDN for math, Google Fonts for CJK |
+| **HTML** | Single-file `.html` (CDN by default) | KaTeX CDN for math, Google Fonts for CJK |
 | **PDF + attachments** | `.pdf` with embedded files | `report.typ` with `#attach()` → `tools/embed_files.py` |
 
 ## Development workflow
@@ -51,7 +51,7 @@ Edit `SKILL.md` in this directory. The file contains:
 Launch a subagent from the repo root and confirm the skill is detected without conflicts:
 
 ```bash
-cd /home/wr/gh/typst_skill
+cd <repo-root>
 pi --model claude-sonnet-4-6 --provider anthropic -p "<prompt>"
 ```
 
@@ -84,7 +84,7 @@ Then run: typst compile local_data/report.typ local_data/report.pdf
 
 ```bash
 pi --model claude-opus-4-6 --provider anthropic -p "
-Use the typst-technical-report skill (HTML workflow). Write a self-contained HTML file
+Use the typst-technical-report skill (HTML workflow). Write a single-file HTML document (CDN assets are fine)
 at ./local_data/report.html. Same topic, Chinese text, KaTeX math (LaTeX syntax,
 NOT Typst syntax). Include table, styled sections, LXGW WenKai font.
 "
@@ -106,13 +106,11 @@ so readers can download the original file. Output to ./local_data/report.pdf
 
 **Verify:**
 - The agent uses the `#attach()` helper in the `.typ` file
-- The agent runs `tools/embed_files.py` instead of plain `typst compile`
-- PyMuPDF venv is set up automatically
+- The agent runs `uv run --with pymupdf python3 tools/embed_files.py ...` instead of plain `typst compile`
 - The resulting PDF contains embedded files (check with):
 
 ```bash
-source /tmp/embed-venv/bin/activate
-python3 -c "
+uv run --with pymupdf python3 -c "
 import fitz
 doc = fitz.open('local_data/report.pdf')
 print(f'Embedded files: {doc.embfile_count()}')
@@ -121,15 +119,15 @@ for i in range(doc.embfile_count()):
     data = doc.embfile_get(i)
     print(f'  {info[\"name\"]} — {len(data)} bytes')
 for p in range(len(doc)):
-    for a in doc[p].annots():
+    for a in doc[p].annots() or []:
         if a.type[1] == 'FileAttachment':
-            print(f'  Annotation page {p+1}: {a.file_info[\"filename\"]} (top-right)')
+            print(f'  Annotation page {p+1}: {a.file_info[\"filename\"]} (near marker)')
 "
 ```
 
 **Attachment checklist:**
 - [ ] `embfile_count() > 0` — files are in the embedded files collection
-- [ ] FileAttachment annotations present at top-right of relevant pages
+- [ ] FileAttachment annotations present near marker positions on relevant pages
 - [ ] Extracted file content is byte-identical to the original source file
 
 ### 6. Test PDF viewer
@@ -161,8 +159,7 @@ chromium --headless --disable-gpu --no-sandbox \
   "file://$(pwd)/local_data/report.html"
 
 # PDF → PNG via pymupdf
-source /tmp/embed-venv/bin/activate
-python3 -c "
+uv run --with pymupdf python3 -c "
 import fitz
 doc = fitz.open('local_data/report.pdf')
 for i, page in enumerate(doc):
@@ -177,7 +174,7 @@ for i, page in enumerate(doc):
 - [ ] Theorem/definition/remark blocks have colored left borders
 - [ ] Table headers are bold, rows are aligned
 - [ ] Page headers show author names and page numbers (PDF, page 2+)
-- [ ] Paperclip annotation icons visible at top-right of pages with attachments
+- [ ] Paperclip annotation icons visible near marker positions on pages with attachments
 
 ### 8. Commit
 
@@ -196,7 +193,7 @@ local_data/
 ├── template.typ          # Typst template (copied from SKILL.md)
 ├── report.typ            # Generated Typst source
 ├── report.pdf            # Compiled PDF (with or without attachments)
-├── report.html           # Self-contained HTML
+├── report.html           # Single-file HTML (typically CDN-backed)
 ├── pdf-viewer.html       # Copied from tools/ for browser testing
 ├── report_html.png       # HTML screenshot
 ├── report_pdf_p1.png     # PDF page renders
@@ -212,7 +209,7 @@ Post-processes a Typst PDF to add embedded file attachments.
 
 **Usage:**
 ```bash
-python3 tools/embed_files.py <input.typ> [-o output.pdf] [-d base_dir]
+uv run --with pymupdf python3 tools/embed_files.py <input.typ> [-o output.pdf] [-d base_dir]
 ```
 
 **What it does (3 steps):**
@@ -220,9 +217,9 @@ python3 tools/embed_files.py <input.typ> [-o output.pdf] [-d base_dir]
 2. `typst query input.typ metadata --format json` — extracts `embed-file` markers with page/position
 3. PyMuPDF post-processing:
    - Adds files to the PDF embedded files collection (visible in attachment panels)
-   - Places FileAttachment annotations at top-right of each relevant page (stacked vertically if multiple per page)
+   - Places FileAttachment annotations near each metadata marker (stacked if multiple overlap)
 
-**Requires:** `pymupdf` (installed via `uv pip install pymupdf`)
+**Requires:** `pymupdf` (recommended invocation: `uv run --with pymupdf ...`)
 
 ### `tools/pdf-viewer.html`
 
@@ -230,7 +227,7 @@ Single-file static HTML page that renders PDFs and extracts embedded attachments
 
 **Features:**
 - Drag-and-drop or file picker to open PDFs
-- Scrollable multi-page rendering
+- Lazy, scrollable multi-page rendering (better for large PDFs)
 - Sidebar listing all embedded attachments with:
   - File icon (extension-based), filename, size
   - Inline preview for text files

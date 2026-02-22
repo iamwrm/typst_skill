@@ -7,27 +7,25 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
 
-  /* ── Design tokens ── */
   :root {
-    --bg:       #0b0b0b;
-    --surface:  #141414;
+    --bg: #0b0b0b;
+    --surface: #141414;
     --surface2: #1c1c1c;
     --surface3: #242424;
-    --border:   #2a2a2a;
+    --border: #2a2a2a;
     --border-h: #3a3a3a;
-    --accent:   #e8611a;
+    --accent: #e8611a;
     --accent-h: #f47a3a;
-    --accent-bg:#1f1410;
-    --text:     #d4d4d4;
+    --accent-bg: #1f1410;
+    --text: #d4d4d4;
     --text-dim: #777;
-    --text-faint:#555;
-    --mono:     'IBM Plex Mono', 'SF Mono', 'Consolas', monospace;
-    --sans:     'Inter', -apple-system, sans-serif;
-    --radius:   6px;
+    --text-faint: #555;
+    --mono: 'IBM Plex Mono', 'SF Mono', 'Consolas', monospace;
+    --sans: 'Inter', -apple-system, sans-serif;
+    --radius: 6px;
     --transition: 0.15s ease;
   }
 
-  /* ── Reset ── */
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -43,13 +41,11 @@
 
   .hidden { display: none !important; }
 
-  /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-h); }
 
-  /* ── Button ── */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -93,11 +89,10 @@
     font-weight: 600;
   }
 
-  /* ── Topbar ── */
   .topbar {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 14px;
     padding: 0 20px;
     height: 48px;
     background: var(--surface);
@@ -116,7 +111,8 @@
   }
   .topbar__logo::before {
     content: '';
-    width: 7px; height: 7px;
+    width: 7px;
+    height: 7px;
     background: var(--accent);
     border-radius: 50%;
   }
@@ -127,8 +123,8 @@
   }
   .topbar__spacer { flex: 1; }
 
-  /* ── Page nav ── */
-  .page-nav {
+  .page-nav,
+  .zoom-nav {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -136,8 +132,9 @@
     font-size: 12px;
     color: var(--text-dim);
   }
+
   .page-nav__input {
-    width: 40px;
+    width: 44px;
     text-align: center;
     padding: 3px 4px;
     border: 1px solid var(--border);
@@ -151,10 +148,15 @@
   .page-nav__input:focus { border-color: var(--accent); }
   .page-nav__total { color: var(--text-faint); }
 
-  /* ── Layout ── */
+  .zoom-nav__label {
+    min-width: 52px;
+    text-align: right;
+    color: var(--text-dim);
+    padding-left: 4px;
+  }
+
   .layout { display: flex; flex: 1; overflow: hidden; }
 
-  /* ── PDF canvas area ── */
   .viewer {
     flex: 1;
     overflow: auto;
@@ -164,15 +166,38 @@
     padding: 24px;
     gap: 20px;
   }
-  .viewer canvas {
-    box-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.3);
+
+  .page-slot {
+    position: relative;
+    background: #0f0f0f;
+    border: 1px solid var(--border);
     border-radius: 2px;
-    max-width: 100%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 32px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
 
-  /* ── Dropzone ── */
+  .page-slot canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .page-slot__ph {
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .page-slot--loading .page-slot__ph {
+    color: var(--text-dim);
+  }
+
   .dropzone {
     flex: 1;
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -184,7 +209,8 @@
   }
   .dropzone--active { background: var(--accent-bg); }
   .dropzone__icon {
-    width: 64px; height: 64px;
+    width: 64px;
+    height: 64px;
     border: 2px dashed var(--border-h);
     border-radius: 16px;
     display: flex;
@@ -206,7 +232,7 @@
   .dropzone__desc {
     color: var(--text-faint);
     font-size: 13px;
-    max-width: 380px;
+    max-width: 420px;
     line-height: 1.7;
   }
   .dropzone__divider {
@@ -222,10 +248,12 @@
   }
   .dropzone__divider::before,
   .dropzone__divider::after {
-    content: ''; flex: 1; height: 1px; background: var(--border);
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
   }
 
-  /* ── Sidebar ── */
   .sidebar {
     width: 340px;
     flex-shrink: 0;
@@ -264,7 +292,6 @@
     line-height: 1.6;
   }
 
-  /* ── Attachment card ── */
   .card {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -307,48 +334,65 @@
   }
   .card__actions { display: flex; gap: 8px; }
 
+  @media (max-width: 900px) {
+    .zoom-nav__label { min-width: 46px; }
+  }
+
   @media (max-width: 768px) {
     .sidebar {
-      position: fixed; right: 0; top: 0; bottom: 0; z-index: 20;
-      box-shadow: -4px 0 32px rgba(0,0,0,0.6);
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 20;
+      box-shadow: -4px 0 32px rgba(0, 0, 0, 0.6);
     }
   }
 </style>
 </head>
 <body>
 
-<!-- ── Topbar ── -->
 <header class="topbar">
   <div class="topbar__logo">pdf-viewer</div>
   <div class="topbar__sep"></div>
+
   <button class="btn" data-action="open">
     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
     open
   </button>
+
   <nav class="page-nav hidden" data-ref="pageNav">
     <button class="btn" data-action="prevPage">‹</button>
     <input class="page-nav__input" type="number" min="1" value="1" data-ref="pageNum">
     <span class="page-nav__total">/ <span data-ref="pageCount">0</span></span>
     <button class="btn" data-action="nextPage">›</button>
   </nav>
+
+  <nav class="zoom-nav hidden" data-ref="zoomNav">
+    <button class="btn" data-action="zoomOut">−</button>
+    <button class="btn" data-action="fitWidth">fit</button>
+    <button class="btn" data-action="zoomIn">+</button>
+    <span class="zoom-nav__label" data-ref="zoomLabel">125%</span>
+  </nav>
+
   <div class="topbar__spacer"></div>
+
   <button class="btn hidden" data-action="toggleSidebar" data-ref="sidebarToggle">
     <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 1.38-1.12 2.5-2.5 2.5S11.5 18.88 11.5 17.5V5A3.5 3.5 0 0115 1.5 3.5 3.5 0 0118.5 5v12.5c0 2.76-2.24 5-5 5s-5-2.24-5-5V6H10v11.5a3.5 3.5 0 003.5 3.5 3.5 3.5 0 003.5-3.5V5c0-1.38-1.12-2.5-2.5-2.5S12 3.62 12 5v12.5c0 .55.45 1 1 1s1-.45 1-1V6h1.5z"/></svg>
     attachments <span class="badge hidden" data-ref="attBadge">0</span>
   </button>
+
   <input type="file" accept=".pdf,application/pdf" class="hidden" data-ref="fileInput">
 </header>
 
-<!-- ── Main layout ── -->
 <div class="layout">
-  <!-- PDF viewer -->
   <main class="viewer" data-ref="viewer">
     <div class="dropzone" data-ref="dropzone">
       <div class="dropzone__icon">↓</div>
       <h2 class="dropzone__title">Open a PDF</h2>
       <p class="dropzone__desc">
-        Drop a PDF here to view it. Embedded file attachments
-        will appear in the sidebar for preview and download.
+        Drop a PDF here to view it. Pages render lazily for better performance on large files.
+        Embedded file attachments appear in the sidebar for preview and download.
       </p>
       <div class="dropzone__divider">or</div>
       <label class="btn btn--accent btn--browse">
@@ -358,7 +402,6 @@
     </div>
   </main>
 
-  <!-- Attachment sidebar -->
   <aside class="sidebar sidebar--collapsed" data-ref="sidebar">
     <div class="sidebar__header">
       Attachments <span class="badge" data-ref="attCount">0</span>
@@ -369,7 +412,6 @@
   </aside>
 </div>
 
-<!-- ── Card template ── -->
 <template data-ref="cardTpl">
   <div class="card">
     <div class="card__name">
@@ -388,14 +430,15 @@
 
 <script type="module">
 
-/* ═══════════════════════════════════════════════════
-   Config
-   ═══════════════════════════════════════════════════ */
-
 const PDFJS_VERSION = "4.9.155";
-const PDFJS_CDN     = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build`;
-const RENDER_SCALE  = 1.5;
-const PREVIEW_MAX   = 2000;
+const PDFJS_CDN = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build`;
+
+const INITIAL_SCALE = 1.25;
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 3.0;
+const SCALE_STEP = 1.12;
+const OBSERVER_ROOT_MARGIN = "900px 0px";
+const PREVIEW_MAX = 2000;
 const COPY_FEEDBACK_MS = 1500;
 
 const TEXT_EXTENSIONS = new Set(
@@ -403,21 +446,19 @@ const TEXT_EXTENSIONS = new Set(
 );
 
 const FILE_ICONS = {
-  py:"🐍", js:"📜", ts:"📘", html:"🌐", css:"🎨", json:"📋", csv:"📊",
-  xml:"📄", yaml:"⚙️", yml:"⚙️", txt:"📝", md:"📝", rs:"🦀", go:"🔷",
-  c:"⚡", cpp:"⚡", h:"⚡", java:"☕", rb:"💎", sh:"🖥️", sql:"🗃️",
-  png:"🖼️", jpg:"🖼️", gif:"🖼️", svg:"🖼️", pdf:"📄",
-  zip:"📦", tar:"📦", gz:"📦",
+  py: "🐍", js: "📜", ts: "📘", html: "🌐", css: "🎨", json: "📋", csv: "📊",
+  xml: "📄", yaml: "⚙️", yml: "⚙️", txt: "📝", md: "📝", rs: "🦀", go: "🔷",
+  c: "⚡", cpp: "⚡", h: "⚡", java: "☕", rb: "💎", sh: "🖥️", sql: "🗃️",
+  png: "🖼️", jpg: "🖼️", gif: "🖼️", svg: "🖼️", pdf: "📄",
+  zip: "📦", tar: "📦", gz: "📦",
 };
 
-/* ═══════════════════════════════════════════════════
-   Utilities
-   ═══════════════════════════════════════════════════ */
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
 const Utils = {
-  /** Get file extension (lowercase, no dot). */
   ext(name) {
-    return name.split(".").pop().toLowerCase();
+    const i = name.lastIndexOf(".");
+    return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
   },
 
   isText(name) {
@@ -429,14 +470,9 @@ const Utils = {
   },
 
   formatBytes(n) {
-    if (n < 1024)    return `${n} B`;
+    if (n < 1024) return `${n} B`;
     if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
     return `${(n / 1048576).toFixed(1)} MB`;
-  },
-
-  escapeHtml(s) {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   },
 
   decode(buf) {
@@ -445,40 +481,38 @@ const Utils = {
 
   downloadBlob(data, filename) {
     const url = URL.createObjectURL(new Blob([data], { type: "application/octet-stream" }));
-    Object.assign(document.createElement("a"), { href: url, download: filename }).click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
     URL.revokeObjectURL(url);
+  },
+
+  looksLikePdf(file) {
+    if (!file) return false;
+    if (file.type === "application/pdf") return true;
+    return file.name.toLowerCase().endsWith(".pdf");
   },
 };
 
-/* ═══════════════════════════════════════════════════
-   DOM helpers
-   ═══════════════════════════════════════════════════ */
-
-/** Collect all data-ref elements into an object. */
 function collectRefs(root = document) {
   const refs = {};
-  for (const el of root.querySelectorAll("[data-ref]")) {
-    refs[el.dataset.ref] = el;
-  }
+  for (const el of root.querySelectorAll("[data-ref]")) refs[el.dataset.ref] = el;
   return refs;
 }
 
-/** Bind click handlers via data-action delegation. */
 function bindActions(root, handlers) {
   root.addEventListener("click", (e) => {
     const target = e.target.closest("[data-action]");
-    if (target && handlers[target.dataset.action]) {
-      handlers[target.dataset.action](e, target);
-    }
+    if (!target) return;
+    const handler = handlers[target.dataset.action];
+    if (handler) handler(e, target);
   });
 }
 
-/* ═══════════════════════════════════════════════════
-   PDF Engine — wraps PDF.js
-   ═══════════════════════════════════════════════════ */
-
 class PDFEngine {
   #doc = null;
+  #pageCache = new Map();
 
   async init() {
     const lib = await import(`${PDFJS_CDN}/pdf.min.mjs`);
@@ -488,6 +522,7 @@ class PDFEngine {
 
   async load(data) {
     this.#doc = await this.lib.getDocument({ data }).promise;
+    this.#pageCache.clear();
     return this.#doc;
   }
 
@@ -495,33 +530,51 @@ class PDFEngine {
     return this.#doc?.numPages ?? 0;
   }
 
-  async renderPage(pageNum, scale = RENDER_SCALE) {
-    const page = await this.#doc.getPage(pageNum);
+  async #getPage(pageNum) {
+    if (!this.#pageCache.has(pageNum)) {
+      this.#pageCache.set(pageNum, this.#doc.getPage(pageNum));
+    }
+    return this.#pageCache.get(pageNum);
+  }
+
+  async getPageSize(pageNum, scale = 1) {
+    const page = await this.#getPage(pageNum);
+    const viewport = page.getViewport({ scale });
+    return { width: viewport.width, height: viewport.height };
+  }
+
+  async renderPage(pageNum, scale) {
+    const page = await this.#getPage(pageNum);
     const viewport = page.getViewport({ scale });
     const canvas = document.createElement("canvas");
     canvas.width = viewport.width;
     canvas.height = viewport.height;
-    canvas.dataset.page = pageNum;
-    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    canvas.dataset.page = String(pageNum);
+
+    await page.render({
+      canvasContext: canvas.getContext("2d"),
+      viewport,
+    }).promise;
+
     return canvas;
   }
 
-  /** Extract all file attachments (embedded files + page annotations). */
   async getAttachments() {
     const results = [];
 
-    // 1. Embedded files collection
     const embedded = await this.#doc.getAttachments();
     if (embedded) {
       for (const [key, att] of Object.entries(embedded)) {
-        results.push({ filename: att.filename || key, content: att.content });
+        results.push({
+          filename: att.filename || key,
+          content: att.content,
+        });
       }
     }
 
-    // 2. FileAttachment annotations (fallback / additional)
     if (results.length === 0) {
       for (let i = 1; i <= this.numPages; i++) {
-        const page = await this.#doc.getPage(i);
+        const page = await this.#getPage(i);
         for (const a of await page.getAnnotations()) {
           if (a.subtype === "FileAttachment" && a.file) {
             results.push({
@@ -537,15 +590,18 @@ class PDFEngine {
   }
 }
 
-/* ═══════════════════════════════════════════════════
-   App
-   ═══════════════════════════════════════════════════ */
-
 class App {
   constructor() {
     this.pdf = new PDFEngine();
     this.refs = collectRefs();
     this.cardTpl = this.refs.cardTpl.content;
+
+    this.currentScale = INITIAL_SCALE;
+    this.pageSlots = new Map();
+    this.renderedScaleByPage = new Map();
+    this.renderingPages = new Set();
+    this.pageBaseSize = null;
+    this.pageObserver = null;
   }
 
   async init() {
@@ -554,50 +610,46 @@ class App {
     await this.#loadFromUrlParam();
   }
 
-  /* ── Event wiring ── */
-
   #bindEvents() {
-    // Button actions (delegated)
     bindActions(document.body, {
-      open:          () => this.refs.fileInput.click(),
-      prevPage:      () => this.#goToPage(this.#currentPage - 1),
-      nextPage:      () => this.#goToPage(this.#currentPage + 1),
+      open: () => this.refs.fileInput.click(),
+      prevPage: () => this.#goToPage(this.#currentPage() - 1),
+      nextPage: () => this.#goToPage(this.#currentPage() + 1),
       toggleSidebar: () => this.refs.sidebar.classList.toggle("sidebar--collapsed"),
+      zoomIn: () => void this.#setScale(this.currentScale * SCALE_STEP),
+      zoomOut: () => void this.#setScale(this.currentScale / SCALE_STEP),
+      fitWidth: () => void this.#fitWidth(),
     });
 
-    // File inputs
-    const onFile = (e) => this.#handleFile(e.target.files[0]);
+    const onFile = (e) => this.#handleFile(e.target.files?.[0]);
     this.refs.fileInput.addEventListener("change", onFile);
     this.refs.fileInput2.addEventListener("change", onFile);
 
-    // Drag & drop
     const { viewer, dropzone } = this.refs;
     viewer.addEventListener("dragover", (e) => {
       e.preventDefault();
       dropzone.classList.add("dropzone--active");
     });
+
     viewer.addEventListener("dragleave", () => {
       dropzone.classList.remove("dropzone--active");
     });
+
     viewer.addEventListener("drop", (e) => {
       e.preventDefault();
       dropzone.classList.remove("dropzone--active");
-      this.#handleFile(e.dataTransfer.files[0]);
+      this.#handleFile(e.dataTransfer?.files?.[0]);
     });
 
-    // Page input
     this.refs.pageNum.addEventListener("change", () => {
-      this.#scrollToPage(parseInt(this.refs.pageNum.value));
+      this.#scrollToPage(parseInt(this.refs.pageNum.value, 10));
     });
 
-    // Track visible page on scroll
     viewer.addEventListener("scroll", () => this.#syncPageIndicator(), { passive: true });
   }
 
-  /* ── File handling ── */
-
   #handleFile(file) {
-    if (!file?.type.includes("pdf")) return;
+    if (!Utils.looksLikePdf(file)) return;
     const reader = new FileReader();
     reader.onload = (e) => this.#loadPdf(new Uint8Array(e.target.result));
     reader.readAsArrayBuffer(file);
@@ -605,7 +657,9 @@ class App {
 
   async #loadPdf(data) {
     await this.pdf.load(data);
-    await this.#renderPages();
+    this.currentScale = INITIAL_SCALE;
+    this.#updateZoomLabel();
+    await this.#buildPageSlots();
     await this.#renderAttachments();
   }
 
@@ -620,36 +674,146 @@ class App {
     }
   }
 
-  /* ── PDF rendering ── */
+  async #buildPageSlots() {
+    const { viewer, dropzone, pageNav, pageNum, pageCount, zoomNav } = this.refs;
 
-  async #renderPages() {
-    const { viewer, dropzone, pageNav, pageNum, pageCount } = this.refs;
+    this.#disconnectObserver();
+    this.pageSlots.clear();
+    this.renderedScaleByPage.clear();
+    this.renderingPages.clear();
 
-    // Clear old canvases
-    viewer.querySelectorAll("canvas").forEach((c) => c.remove());
+    for (const node of viewer.querySelectorAll(".page-slot")) node.remove();
+
     dropzone.classList.add("hidden");
 
+    pageCount.textContent = String(this.pdf.numPages);
+    pageNum.max = String(this.pdf.numPages);
+    pageNum.value = "1";
+    pageNav.classList.toggle("hidden", this.pdf.numPages <= 1);
+    zoomNav.classList.remove("hidden");
+
+    this.pageBaseSize = await this.pdf.getPageSize(1, this.currentScale);
+
     for (let i = 1; i <= this.pdf.numPages; i++) {
-      viewer.appendChild(await this.pdf.renderPage(i));
+      const slot = document.createElement("div");
+      slot.className = "page-slot";
+      slot.dataset.page = String(i);
+      slot.style.width = `${this.pageBaseSize.width}px`;
+      slot.style.height = `${this.pageBaseSize.height}px`;
+      slot.innerHTML = `<div class="page-slot__ph">page ${i}</div>`;
+      viewer.appendChild(slot);
+      this.pageSlots.set(i, slot);
     }
 
-    // Page nav
-    pageCount.textContent = this.pdf.numPages;
-    pageNum.max = this.pdf.numPages;
-    pageNum.value = 1;
-    pageNav.classList.toggle("hidden", this.pdf.numPages <= 1);
+    this.#connectObserver();
+    void this.#ensureRendered(1);
+    void this.#ensureRendered(2);
   }
 
-  /* ── Attachments ── */
+  #connectObserver() {
+    this.#disconnectObserver();
+
+    this.pageObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const page = parseInt(entry.target.dataset.page, 10);
+          if (!Number.isFinite(page)) continue;
+          void this.#ensureRendered(page);
+        }
+      },
+      {
+        root: this.refs.viewer,
+        rootMargin: OBSERVER_ROOT_MARGIN,
+        threshold: 0.01,
+      }
+    );
+
+    for (const slot of this.pageSlots.values()) {
+      this.pageObserver.observe(slot);
+    }
+  }
+
+  #disconnectObserver() {
+    if (this.pageObserver) {
+      this.pageObserver.disconnect();
+      this.pageObserver = null;
+    }
+  }
+
+  async #ensureRendered(pageNum) {
+    if (pageNum < 1 || pageNum > this.pdf.numPages) return;
+    if (this.renderingPages.has(pageNum)) return;
+    if (this.renderedScaleByPage.get(pageNum) === this.currentScale) return;
+
+    const slot = this.pageSlots.get(pageNum);
+    if (!slot) return;
+
+    this.renderingPages.add(pageNum);
+    slot.classList.add("page-slot--loading");
+
+    try {
+      const canvas = await this.pdf.renderPage(pageNum, this.currentScale);
+      slot.replaceChildren(canvas);
+      slot.style.width = `${canvas.width}px`;
+      slot.style.height = `${canvas.height}px`;
+      this.renderedScaleByPage.set(pageNum, this.currentScale);
+    } catch (e) {
+      console.error(`Failed to render page ${pageNum}:`, e);
+      slot.innerHTML = `<div class="page-slot__ph">failed to render page ${pageNum}</div>`;
+    } finally {
+      slot.classList.remove("page-slot--loading");
+      this.renderingPages.delete(pageNum);
+    }
+  }
+
+  async #setScale(nextScale) {
+    if (this.pdf.numPages === 0) return;
+
+    const targetScale = clamp(nextScale, MIN_SCALE, MAX_SCALE);
+    if (Math.abs(targetScale - this.currentScale) < 0.001) return;
+
+    const anchorPage = this.#currentPage();
+    this.currentScale = targetScale;
+    this.#updateZoomLabel();
+
+    this.renderedScaleByPage.clear();
+    this.renderingPages.clear();
+
+    this.pageBaseSize = await this.pdf.getPageSize(1, this.currentScale);
+
+    for (const [page, slot] of this.pageSlots.entries()) {
+      slot.style.width = `${this.pageBaseSize.width}px`;
+      slot.style.height = `${this.pageBaseSize.height}px`;
+      slot.innerHTML = `<div class="page-slot__ph">page ${page}</div>`;
+    }
+
+    this.#scrollToPage(anchorPage, false);
+
+    void this.#ensureRendered(anchorPage);
+    void this.#ensureRendered(anchorPage - 1);
+    void this.#ensureRendered(anchorPage + 1);
+  }
+
+  async #fitWidth() {
+    if (this.pdf.numPages === 0) return;
+    const pageAtScale1 = await this.pdf.getPageSize(1, 1);
+    const available = Math.max(240, this.refs.viewer.clientWidth - 56);
+    const fitScale = available / pageAtScale1.width;
+    await this.#setScale(fitScale);
+  }
+
+  #updateZoomLabel() {
+    this.refs.zoomLabel.textContent = `${Math.round(this.currentScale * 100)}%`;
+  }
 
   async #renderAttachments() {
     const attachments = await this.pdf.getAttachments();
     const { attList, attCount, attBadge, sidebarToggle, sidebar } = this.refs;
     const count = attachments.length;
 
-    // Update badges
-    attCount.textContent = count;
-    attBadge.textContent = count;
+    attCount.textContent = String(count);
+    attBadge.textContent = String(count);
     attBadge.classList.toggle("hidden", count === 0);
     sidebarToggle.classList.remove("hidden");
 
@@ -658,7 +822,6 @@ class App {
       return;
     }
 
-    // Build cards
     attList.innerHTML = "";
     for (const att of attachments) {
       attList.appendChild(this.#createCard(att));
@@ -666,7 +829,6 @@ class App {
     sidebar.classList.remove("sidebar--collapsed");
   }
 
-  /** Create a card element from the <template>. */
   #createCard({ filename, content }) {
     const frag = this.cardTpl.cloneNode(true);
     const card = frag.querySelector(".card");
@@ -676,31 +838,38 @@ class App {
     slot("filename").textContent = filename;
     slot("meta").textContent = Utils.formatBytes(content.length);
 
-    // Text preview
     if (Utils.isText(filename)) {
       try {
         const text = Utils.decode(content);
-        const truncated = text.length > PREVIEW_MAX ? text.slice(0, PREVIEW_MAX) + "\n…" : text;
+        const truncated = text.length > PREVIEW_MAX ? `${text.slice(0, PREVIEW_MAX)}\n…` : text;
         const pre = document.createElement("div");
         pre.className = "card__preview";
         pre.textContent = truncated;
         card.querySelector(".card__actions").before(pre);
-      } catch { /* binary */ }
 
-      // Copy button
-      const copyBtn = document.createElement("button");
-      copyBtn.className = "btn";
-      copyBtn.textContent = "copy";
-      copyBtn.addEventListener("click", async () => {
-        await navigator.clipboard.writeText(Utils.decode(content));
-        copyBtn.textContent = "copied";
-        copyBtn.style.color = "var(--accent)";
-        setTimeout(() => { copyBtn.textContent = "copy"; copyBtn.style.color = ""; }, COPY_FEEDBACK_MS);
-      });
-      card.querySelector(".card__actions").appendChild(copyBtn);
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "btn";
+        copyBtn.textContent = "copy";
+        copyBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            copyBtn.textContent = "copied";
+            copyBtn.style.color = "var(--accent)";
+            setTimeout(() => {
+              copyBtn.textContent = "copy";
+              copyBtn.style.color = "";
+            }, COPY_FEEDBACK_MS);
+          } catch {
+            copyBtn.textContent = "blocked";
+            setTimeout(() => (copyBtn.textContent = "copy"), COPY_FEEDBACK_MS);
+          }
+        });
+        card.querySelector(".card__actions").appendChild(copyBtn);
+      } catch {
+        // Binary or invalid UTF-8
+      }
     }
 
-    // Download
     card.querySelector('[data-action="download"]').addEventListener("click", () => {
       Utils.downloadBlob(content, filename);
     });
@@ -708,37 +877,48 @@ class App {
     return card;
   }
 
-  /* ── Page navigation ── */
-
-  get #currentPage() {
-    return parseInt(this.refs.pageNum.value) || 1;
+  #currentPage() {
+    return parseInt(this.refs.pageNum.value, 10) || 1;
   }
 
-  #goToPage(n) {
-    const clamped = Math.max(1, Math.min(this.pdf.numPages, n));
-    this.refs.pageNum.value = clamped;
+  #goToPage(page) {
+    const clamped = clamp(page, 1, this.pdf.numPages);
+    this.refs.pageNum.value = String(clamped);
     this.#scrollToPage(clamped);
   }
 
-  #scrollToPage(n) {
-    this.refs.viewer
-      .querySelector(`canvas[data-page="${n}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  #scrollToPage(page, smooth = true) {
+    const slot = this.pageSlots.get(page);
+    if (!slot) return;
+    slot.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+    void this.#ensureRendered(page);
+    void this.#ensureRendered(page - 1);
+    void this.#ensureRendered(page + 1);
   }
 
   #syncPageIndicator() {
+    const slots = [...this.pageSlots.values()];
+    if (slots.length === 0) return;
+
     const viewerTop = this.refs.viewer.getBoundingClientRect().top;
-    for (const c of this.refs.viewer.querySelectorAll("canvas")) {
-      const r = c.getBoundingClientRect();
-      if (r.top >= viewerTop - r.height / 2) {
-        this.refs.pageNum.value = c.dataset.page;
+    let current = 1;
+
+    for (const slot of slots) {
+      const r = slot.getBoundingClientRect();
+      if (r.top <= viewerTop + 32) {
+        current = parseInt(slot.dataset.page, 10);
+      } else {
         break;
       }
     }
+
+    this.refs.pageNum.value = String(current);
+    void this.#ensureRendered(current - 1);
+    void this.#ensureRendered(current);
+    void this.#ensureRendered(current + 1);
   }
 }
 
-/* ── Bootstrap ── */
 await new App().init();
 
 </script>
