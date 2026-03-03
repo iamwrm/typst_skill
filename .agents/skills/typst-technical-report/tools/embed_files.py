@@ -13,10 +13,12 @@ Workflow:
 """
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 
 def require_pymupdf():
@@ -71,6 +73,42 @@ def query_embed_metadata(typ_path: Path) -> list[dict]:
     return entries
 
 
+def sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def prompt_rename_on_hash_conflict(
+    name: str, existing_hash: str, new_hash: str
+) -> Optional[str]:
+    """
+    Ask user to provide a new attachment filename when the same name maps to
+    different file content. Returns None if user chooses to skip.
+    """
+    print(
+        "\n⚠ Attachment name conflict with different content:\n"
+        f"  name: {name}\n"
+        f"  existing sha256: {existing_hash[:12]}...\n"
+        f"  new      sha256: {new_hash[:12]}..."
+    )
+
+    if not sys.stdin.isatty():
+        print(
+            "ERROR: Cannot prompt for rename in non-interactive mode. "
+            f"Please rename one of the files referenced as '{name}' in the Typst source.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    while True:
+        new_name = input("Enter a new attachment filename (or 'skip' to skip this marker): ").strip()
+        if not new_name:
+            print("Please enter a non-empty filename.")
+            continue
+        if new_name.lower() == "skip":
+            return None
+        return new_name
+
+
 def embed_files_in_pdf(pdf_path: Path, entries: list[dict], base_dir: Path) -> None:
     """
     Open the PDF, embed files, and add FileAttachment annotations.
@@ -79,6 +117,12 @@ def embed_files_in_pdf(pdf_path: Path, entries: list[dict], base_dir: Path) -> N
     fitz = require_pymupdf()
     doc = fitz.open(str(pdf_path))
     placement_counts: dict[tuple[int, int, int], int] = {}
+    embedded_hash_by_name: dict[str, str] = {}
+
+    embedded_count = 0
+    reused_count = 0
+    annotation_count = 0
+    skipped_count = 0
 
     for entry in entries:
         filename = entry["file"]
@@ -91,27 +135,58 @@ def embed_files_in_pdf(pdf_path: Path, entries: list[dict], base_dir: Path) -> N
         file_path = base_dir / filename
         if not file_path.exists():
             print(f"WARNING: File not found: {file_path}, skipping", file=sys.stderr)
+            skipped_count += 1
             continue
 
         file_data = file_path.read_bytes()
+        file_hash = sha256_hex(file_data)
 
         # 1) Add to PDF embedded files collection (shows in attachment panel)
-        try:
-            doc.embfile_add(
-                name=filename,
-                buffer_=file_data,
-                filename=filename,
-                ufilename=filename,
-                desc=desc,
-            )
-            print(f"  ✓ Embedded file: {filename} ({len(file_data)} bytes)")
-        except ValueError:
-            # Already embedded (duplicate name)
-            print(f"  ⚠ File already embedded: {filename}")
+        attach_name = filename
+        while True:
+            existing_hash = embedded_hash_by_name.get(attach_name)
+            if existing_hash is None:
+                doc.embfile_add(
+                    name=attach_name,
+                    buffer_=file_data,
+                    filename=attach_name,
+                    ufilename=attach_name,
+                    desc=desc,
+                )
+                embedded_hash_by_name[attach_name] = file_hash
+                embedded_count += 1
+                if attach_name == filename:
+                    print(f"  ✓ Embedded file: {attach_name} ({len(file_data)} bytes)")
+                else:
+                    print(
+                        f"  ✓ Embedded file as renamed attachment: {attach_name} "
+                        f"(source: {filename}, {len(file_data)} bytes)"
+                    )
+                break
+
+            if existing_hash == file_hash:
+                reused_count += 1
+                print(
+                    f"  ↺ Reused embedded file: {attach_name} "
+                    f"(same sha256 {file_hash[:12]}...)"
+                )
+                break
+
+            new_name = prompt_rename_on_hash_conflict(attach_name, existing_hash, file_hash)
+            if new_name is None:
+                print(f"  ⚠ Skipped marker for {filename}")
+                skipped_count += 1
+                attach_name = None
+                break
+            attach_name = new_name
+
+        if attach_name is None:
+            continue
 
         # 2) Add a FileAttachment annotation on the marked page
         if page_num < 0 or page_num >= len(doc):
             print(f"WARNING: Page {page_num + 1} out of range for {filename}", file=sys.stderr)
+            skipped_count += 1
             continue
 
         page = doc[page_num]
@@ -134,8 +209,8 @@ def embed_files_in_pdf(pdf_path: Path, entries: list[dict], base_dir: Path) -> N
         annot = page.add_file_annot(
             point=point,
             buffer_=file_data,
-            filename=filename,
-            ufilename=filename,
+            filename=attach_name,
+            ufilename=attach_name,
             desc=desc,
             icon="Paperclip",  # Options: Graph, Paperclip, PushPin, Tag
         )
@@ -143,14 +218,21 @@ def embed_files_in_pdf(pdf_path: Path, entries: list[dict], base_dir: Path) -> N
         # Style the annotation
         annot.set_colors(stroke=(0.1, 0.2, 0.5))  # Dark blue
         annot.update()
+        annotation_count += 1
 
         print(
             f"  ✓ Annotation on page {page_num + 1} near marker "
-            f"({point.x:.1f}, {point.y:.1f}): {filename}"
+            f"({point.x:.1f}, {point.y:.1f}): {attach_name}"
         )
 
     doc.saveIncr()
     doc.close()
+
+    print(
+        "\nAttachment summary: "
+        f"embedded={embedded_count}, reused={reused_count}, "
+        f"annotations={annotation_count}, skipped={skipped_count}"
+    )
 
 
 def main() -> None:
